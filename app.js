@@ -7,7 +7,13 @@ const COLORS = ["#1D9E75","#7F77DD","#D4537E","#378ADD","#BA7517","#D85A30"];
 const DAYS_SHORT = ["L","M","M","G","V","S","D"];
 const MONTHS = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 
-const toKey = d => { const x = new Date(d); x.setHours(0,0,0,0); return x.toISOString().slice(0,10); };
+const toKey = d => {
+  const x = new Date(d);
+  const y = x.getFullYear();
+  const m = String(x.getMonth()+1).padStart(2,"0");
+  const day = String(x.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+};
 const todayKey = toKey(new Date());
 
 function getWeekDates(offset = 0) {
