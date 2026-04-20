@@ -44,6 +44,7 @@ function App() {
   const [events, setEvents] = useState(() => load("events", []));
   const [checked, setChecked] = useState(() => load("checked", {}));
   const [weekOff, setWeekOff] = useState(0);
+  const [selectedDay, setSelectedDay] = useState(todayKey);
   const [reportPeriod, setReportPeriod] = useState("week");
   const [reportOff, setReportOff] = useState(0);
   const [adding, setAdding] = useState(false);
@@ -58,6 +59,12 @@ function App() {
 
   const weekDates = useMemo(() => getWeekDates(weekOff), [weekOff]);
 
+  // when navigating weeks, if selected day not in current week, reset to first day of week
+  useEffect(() => {
+    const keys = weekDates.map(d => toKey(d));
+    if (!keys.includes(selectedDay)) setSelectedDay(keys.includes(todayKey) ? todayKey : keys[0]);
+  }, [weekOff]);
+
   const toggle = (id, dk) => setChecked(p => ({...p, [`${id}_${dk}`]: !p[`${id}_${dk}`]}));
   const isDone = (id, dk) => !!checked[`${id}_${dk}`];
 
@@ -67,7 +74,13 @@ function App() {
     return s;
   };
 
-  const todayDone = habits.filter(h => isDone(h.id, todayKey)).length;
+  const selectedDone = habits.filter(h => isDone(h.id, selectedDay)).length;
+  const isToday = selectedDay === todayKey;
+
+  const selectedDateObj = new Date(selectedDay + "T00:00:00");
+  const selectedLabel = isToday
+    ? "Oggi"
+    : selectedDateObj.toLocaleDateString("it", { weekday:"long", day:"numeric", month:"long" });
 
   const addItem = () => {
     if (!newName.trim()) return;
@@ -110,29 +123,33 @@ function App() {
     return Math.round(pastDates.filter(d => isDone(id, toKey(d))).length / pastDates.length * 100);
   };
 
-  const pct = habits.length > 0 ? todayDone / habits.length : 0;
+  const pct = habits.length > 0 ? selectedDone / habits.length : 0;
   const r = 22, circ = Math.round(2 * Math.PI * r);
 
   return React.createElement("div", { style: { display:"flex", flexDirection:"column", minHeight:"100dvh", background:"#f2f2f7" } },
 
     // ── PAGE: HABITS ──
     page === "habits" && React.createElement("div", { style: { flex:1, overflowY:"auto", paddingBottom:80 } },
+
       // Header
       React.createElement("div", { style: { background:"#fff", padding:"60px 20px 16px" } },
-        React.createElement("div", { style: { fontSize:13, color:"#8e8e93", marginBottom:4 } },
-          new Date().toLocaleDateString("it",{ weekday:"long", day:"numeric", month:"long" })
-        ),
+        React.createElement("div", { style: { fontSize:13, color:"#8e8e93", marginBottom:4, textTransform:"capitalize" } }, selectedLabel),
         React.createElement("div", { style: { fontSize:26, fontWeight:700, color:"#1c1c1e", marginBottom:16 } }, "Le mie abitudini"),
+
+        // Progress ring card
         React.createElement("div", { style: { background:ACCENT_LIGHT, borderRadius:18, padding:"14px 18px", display:"flex", alignItems:"center", justifyContent:"space-between" } },
           React.createElement("div", null,
-            React.createElement("div", { style: { fontSize:12, color:ACCENT_DARK, marginBottom:2 } }, "Completate oggi"),
+            React.createElement("div", { style: { fontSize:12, color:ACCENT_DARK, marginBottom:2 } },
+              isToday ? "Completate oggi" : "Completate quel giorno"
+            ),
             React.createElement("div", { style: { fontSize:26, fontWeight:700, color:ACCENT_DARK } },
-              todayDone, React.createElement("span", { style: { fontSize:15, fontWeight:400 } }, ` / ${habits.length}`)
+              selectedDone,
+              React.createElement("span", { style: { fontSize:15, fontWeight:400 } }, ` / ${habits.length}`)
             )
           ),
           React.createElement("svg", { width:52, height:52, viewBox:"0 0 52 52" },
-            React.createElement("circle", { cx:26, cy:26, r:r, fill:"none", stroke:ACCENT+"40", strokeWidth:4 }),
-            React.createElement("circle", { cx:26, cy:26, r:r, fill:"none", stroke:ACCENT, strokeWidth:4,
+            React.createElement("circle", { cx:26, cy:26, r, fill:"none", stroke:ACCENT+"40", strokeWidth:4 }),
+            React.createElement("circle", { cx:26, cy:26, r, fill:"none", stroke:ACCENT, strokeWidth:4,
               strokeDasharray:`${Math.round(circ * pct)} ${circ}`, strokeLinecap:"round", transform:"rotate(-90 26 26)" }),
             React.createElement("text", { x:26, y:31, textAnchor:"middle", fontSize:12, fontWeight:"600", fill:ACCENT_DARK },
               `${Math.round(pct*100)}%`)
@@ -140,57 +157,65 @@ function App() {
         )
       ),
 
-      // Week nav + dots
+      // Week nav + day selector
       React.createElement("div", { style: { background:"#fff", marginTop:1, padding:"12px 20px 16px" } },
         React.createElement("div", { style: { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 } },
           React.createElement("button", { onClick:()=>setWeekOff(w=>w-1), style: { background:"none", border:"none", cursor:"pointer", fontSize:20, color:"#8e8e93", padding:"4px 8px" } }, "‹"),
           React.createElement("span", { style: { fontSize:14, fontWeight:500, color:"#1c1c1e" } }, weekLabel()),
           React.createElement("button", { onClick:()=>setWeekOff(w=>w+1), style: { background:"none", border:"none", cursor:"pointer", fontSize:20, color:"#8e8e93", padding:"4px 8px" } }, "›")
         ),
+
+        // Day dots — now tappable
         React.createElement("div", { style: { display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:4 } },
           weekDates.map((d,i) => {
-            const k = toKey(d), isToday = k===todayKey;
+            const k = toKey(d);
+            const isSelected = k === selectedDay;
+            const isTod = k === todayKey;
             const done = habits.filter(h=>isDone(h.id,k)).length;
             const full = done === habits.length && habits.length > 0;
-            return React.createElement("div", { key:k, style: { display:"flex", flexDirection:"column", alignItems:"center", gap:4 } },
-              React.createElement("span", { style: { fontSize:11, color:isToday?ACCENT:"#8e8e93", fontWeight:isToday?600:400 } }, DAYS_SHORT[i]),
+            return React.createElement("div", { key:k,
+              onClick: () => setSelectedDay(k),
+              style: { display:"flex", flexDirection:"column", alignItems:"center", gap:4, cursor:"pointer", WebkitTapHighlightColor:"transparent" } },
+              React.createElement("span", { style: { fontSize:11,
+                color: isSelected ? ACCENT : isTod ? ACCENT : "#8e8e93",
+                fontWeight: isSelected || isTod ? 600 : 400 } }, DAYS_SHORT[i]),
               React.createElement("div", { style: { width:34, height:34, borderRadius:10,
-                background: full?ACCENT:done>0?ACCENT_LIGHT:"#f2f2f7",
-                border: isToday?`2px solid ${ACCENT}`:"2px solid transparent",
-                display:"flex", alignItems:"center", justifyContent:"center" } },
+                background: isSelected ? ACCENT : full ? ACCENT_LIGHT : "#f2f2f7",
+                border: isTod && !isSelected ? `2px solid ${ACCENT}` : "2px solid transparent",
+                display:"flex", alignItems:"center", justifyContent:"center",
+                transition:"all 0.15s" } },
                 React.createElement("span", { style: { fontSize:12, fontWeight:600,
-                  color: full?"#fff":done>0?ACCENT_DARK:isToday?ACCENT:"#8e8e93" } }, d.getDate())
+                  color: isSelected ? "#fff" : full ? ACCENT_DARK : isTod ? ACCENT : "#8e8e93" } }, d.getDate())
               ),
-              done > 0 && React.createElement("div", { style: { width:4, height:4, borderRadius:2, background:ACCENT } })
+              done > 0 && !isSelected && React.createElement("div", { style: { width:4, height:4, borderRadius:2, background:ACCENT } })
             );
           })
         )
       ),
 
-      // Habit list
+      // Habit list for selectedDay
       React.createElement("div", { style: { padding:"12px 16px 0" } },
         habits.map((h, hi) => {
           const color = COLORS[hi % COLORS.length];
           const s = streak(h.id);
-          const done = isDone(h.id, todayKey);
+          const done = isDone(h.id, selectedDay);
           return React.createElement("div", { key:h.id,
             style: { display:"flex", alignItems:"center", gap:14, padding:"14px 14px",
-              background: done?"#f0fdf8":"#fff", borderRadius:18, marginBottom:8, cursor:"pointer",
-              border:`1px solid ${done?ACCENT+"60":"#e5e5ea"}`, transition:"all 0.15s",
+              background: done ? "#f0fdf8" : "#fff", borderRadius:18, marginBottom:8,
+              border:`1px solid ${done ? ACCENT+"60" : "#e5e5ea"}`, transition:"all 0.15s",
               WebkitTapHighlightColor:"transparent" } },
-            React.createElement("div", { onClick:()=>toggle(h.id, todayKey), style:{ display:"flex",alignItems:"center",gap:14,flex:1 } },
+            React.createElement("div", { onClick:()=>toggle(h.id, selectedDay), style:{ display:"flex", alignItems:"center", gap:14, flex:1, cursor:"pointer" } },
               React.createElement("div", { style: { width:44, height:44, borderRadius:13, background:color+"20", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 } },
                 React.createElement("span", { style: { fontSize:22 } }, h.emoji)
               ),
               React.createElement("div", { style: { flex:1 } },
                 React.createElement("div", { style: { fontSize:16, fontWeight:500, color:done?"#0F6E56":"#1c1c1e", textDecoration:done?"line-through":"none", opacity:done?0.75:1 } }, h.name),
-                s > 0 && React.createElement("div", { style: { fontSize:12, color:color, marginTop:2 } }, `🔥 ${s} giorni consecutivi`)
+                s > 0 && React.createElement("div", { style: { fontSize:12, color, marginTop:2 } }, `🔥 ${s} giorni consecutivi`)
               )
             ),
             React.createElement("div", { style: { display:"flex", flexDirection:"column", gap:6, alignItems:"center" } },
-              React.createElement("div", { onClick:()=>toggle(h.id, todayKey), style: { width:28, height:28, borderRadius:8,
-                background:done?ACCENT:"transparent",
-                border:`2px solid ${done?ACCENT:"#c7c7cc"}`,
+              React.createElement("div", { onClick:()=>toggle(h.id, selectedDay), style: { width:28, height:28, borderRadius:8,
+                background:done?ACCENT:"transparent", border:`2px solid ${done?ACCENT:"#c7c7cc"}`,
                 display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 } },
                 done && React.createElement("span", { style: { color:"#fff", fontSize:15, lineHeight:1, fontWeight:700 } }, "✓")
               ),
@@ -200,10 +225,10 @@ function App() {
           );
         }),
 
-        // Events today
-        events.filter(e=>e.date===todayKey).map(e => {
-          const done = isDone(e.id, todayKey);
-          return React.createElement("div", { key:e.id, onClick:()=>toggle(e.id, todayKey),
+        // Events on selectedDay
+        events.filter(e => e.date === selectedDay).map(e => {
+          const done = isDone(e.id, selectedDay);
+          return React.createElement("div", { key:e.id, onClick:()=>toggle(e.id, selectedDay),
             style: { display:"flex", alignItems:"center", gap:14, padding:"14px 14px",
               background:"#fffbf0", borderRadius:18, marginBottom:8, cursor:"pointer",
               border:"1px solid #f5e6c0", WebkitTapHighlightColor:"transparent" } },
@@ -220,7 +245,7 @@ function App() {
                 display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 } },
                 done && React.createElement("span", { style: { color:"#fff", fontSize:15, fontWeight:700 } }, "✓")
               ),
-              React.createElement("button", { onClick:e2=>{e2.stopPropagation();removeEvent(e.id);},
+              React.createElement("button", { onClick:ev=>{ev.stopPropagation();removeEvent(e.id);},
                 style: { background:"none", border:"none", cursor:"pointer", fontSize:14, color:"#c7c7cc", padding:0 } }, "✕")
             )
           );
@@ -229,8 +254,8 @@ function App() {
         // Add button / form
         !adding && React.createElement("button", { onClick:()=>setAdding(true),
           style: { width:"100%", padding:"15px", borderRadius:18, border:"1.5px dashed #c7c7cc",
-            background:"none", cursor:"pointer", fontSize:15, color:"#8e8e93",
-            marginTop:4, WebkitTapHighlightColor:"transparent" } },
+            background:"none", cursor:"pointer", fontSize:15, color:"#8e8e93", marginTop:4,
+            WebkitTapHighlightColor:"transparent" } },
           "+ Aggiungi abitudine o attività"
         ),
 
@@ -239,8 +264,7 @@ function App() {
             ["daily","event"].map(t =>
               React.createElement("button", { key:t, onClick:()=>setNewType(t),
                 style: { flex:1, padding:"10px", borderRadius:12, fontSize:14, cursor:"pointer", border:"none",
-                  background:newType===t?ACCENT:"#f2f2f7",
-                  color:newType===t?"#fff":"#8e8e93", fontWeight:newType===t?600:400 } },
+                  background:newType===t?ACCENT:"#f2f2f7", color:newType===t?"#fff":"#8e8e93", fontWeight:newType===t?600:400 } },
                 t==="daily"?"Quotidiana":"Extra"
               )
             )
@@ -286,10 +310,8 @@ function App() {
       ),
 
       React.createElement("div", { style: { padding:"14px 16px 0" } },
-        // Stat cards
         React.createElement("div", { style: { display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 } },
-          [{ label:"Tasso globale", val:`${globalRate}%` },
-           { label:"Giorni tracciati", val:pastDates.length }].map(({label,val}) =>
+          [{ label:"Tasso globale", val:`${globalRate}%` }, { label:"Giorni tracciati", val:pastDates.length }].map(({label,val}) =>
             React.createElement("div", { key:label, style: { background:"#fff", borderRadius:18, padding:"16px" } },
               React.createElement("div", { style: { fontSize:12, color:"#8e8e93", marginBottom:4 } }, label),
               React.createElement("div", { style: { fontSize:28, fontWeight:700, color:"#1c1c1e" } }, val)
@@ -297,7 +319,6 @@ function App() {
           )
         ),
 
-        // Monthly calendar
         reportPeriod==="month" && React.createElement("div", { style: { background:"#fff", borderRadius:18, padding:"16px", marginBottom:14 } },
           React.createElement("div", { style: { display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:3, marginBottom:6 } },
             DAYS_SHORT.map((d,i) => React.createElement("div", { key:i, style: { textAlign:"center", fontSize:10, color:"#8e8e93", paddingBottom:2 } }, d))
@@ -305,21 +326,20 @@ function App() {
           React.createElement("div", { style: { display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:3 } },
             [...Array((reportDates[0].getDay()+6)%7)].map((_,i) => React.createElement("div", { key:"e"+i })),
             reportDates.map(d => {
-              const k = toKey(d), isToday = k===todayKey, isPast = k<=todayKey;
+              const k = toKey(d), isTod = k===todayKey, isPast = k<=todayKey;
               const done = habits.filter(h=>isDone(h.id,k)).length;
               const full = done===habits.length && habits.length>0;
               return React.createElement("div", { key:k, style: { aspectRatio:"1", borderRadius:6,
                 background: !isPast?"#f2f2f7":full?ACCENT:done>0?ACCENT_LIGHT:"#f2f2f7",
-                border: isToday?`2px solid ${ACCENT}`:"2px solid transparent",
+                border: isTod?`2px solid ${ACCENT}`:"2px solid transparent",
                 display:"flex", alignItems:"center", justifyContent:"center" } },
-                React.createElement("span", { style: { fontSize:11, fontWeight:isToday?700:400,
+                React.createElement("span", { style: { fontSize:11, fontWeight:isTod?700:400,
                   color: !isPast?"#c7c7cc":full?"#fff":done>0?ACCENT_DARK:"#8e8e93" } }, d.getDate())
               );
             })
           )
         ),
 
-        // Habit bars
         React.createElement("div", { style: { background:"#fff", borderRadius:18, overflow:"hidden", marginBottom:14 } },
           habits.map((h,hi) => {
             const color = COLORS[hi%COLORS.length];
@@ -329,8 +349,8 @@ function App() {
               React.createElement("div", { style: { display:"flex", alignItems:"center", gap:10, marginBottom:8 } },
                 React.createElement("span", { style: { fontSize:20 } }, h.emoji),
                 React.createElement("span", { style: { flex:1, fontSize:15, color:"#1c1c1e" } }, h.name),
-                s > 0 && React.createElement("span", { style: { fontSize:12, color:color } }, `🔥${s}`),
-                React.createElement("span", { style: { fontSize:15, fontWeight:600, color:color } }, `${rate}%`)
+                s > 0 && React.createElement("span", { style: { fontSize:12, color } }, `🔥${s}`),
+                React.createElement("span", { style: { fontSize:15, fontWeight:600, color } }, `${rate}%`)
               ),
               React.createElement("div", { style: { height:5, borderRadius:3, background:"#f2f2f7" } },
                 React.createElement("div", { style: { height:"100%", borderRadius:3, background:color, width:`${rate}%` } })
@@ -339,7 +359,6 @@ function App() {
           })
         ),
 
-        // Events in period
         events.filter(e=>reportDates.some(d=>toKey(d)===e.date)).length > 0 &&
           React.createElement("div", { style: { background:"#fff", borderRadius:18, overflow:"hidden", marginBottom:14 } },
             React.createElement("div", { style: { padding:"12px 16px 8px", fontSize:12, fontWeight:600, color:"#8e8e93", borderBottom:"0.5px solid #f2f2f7" } }, "Attività extra"),
@@ -367,8 +386,7 @@ function App() {
       background:"rgba(255,255,255,0.92)", backdropFilter:"blur(12px)",
       borderTop:"0.5px solid #e5e5ea", display:"flex", justifyContent:"space-around",
       padding:"10px 0 28px", zIndex:100 } },
-      [{ id:"habits", label:"Abitudini", icon:"✓" },
-       { id:"report", label:"Andamento", icon:"◎" }].map(({id,label,icon}) =>
+      [{ id:"habits", label:"Abitudini", icon:"✓" }, { id:"report", label:"Andamento", icon:"◎" }].map(({id,label,icon}) =>
         React.createElement("button", { key:id, onClick:()=>setPage(id),
           style: { background:"none", border:"none", cursor:"pointer", display:"flex", flexDirection:"column",
             alignItems:"center", gap:3, padding:"4px 32px", WebkitTapHighlightColor:"transparent",
