@@ -11,7 +11,7 @@ const toKey = d => { const x = new Date(d); x.setHours(0,0,0,0); return x.toISOS
 const todayKey = toKey(new Date());
 
 function getWeekDates(offset = 0) {
-  const d = new Date(); d.setHours(0,0,0,0);
+  const d = new Date(); d.setHours(12,0,0,0);
   d.setDate(d.getDate() + offset * 7);
   const day = d.getDay();
   const mon = new Date(d); mon.setDate(d.getDate() - ((day + 6) % 7));
@@ -19,7 +19,7 @@ function getWeekDates(offset = 0) {
 }
 
 function getMonthDates(offset = 0) {
-  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + offset);
+  const d = new Date(); d.setHours(12,0,0,0); d.setDate(1); d.setMonth(d.getMonth() + offset);
   const last = new Date(d.getFullYear(), d.getMonth()+1, 0);
   const dates = [];
   for (let x = new Date(d); x <= last; x.setDate(x.getDate()+1)) dates.push(new Date(x));
@@ -77,7 +77,7 @@ function App() {
   const selectedDone = habits.filter(h => isDone(h.id, selectedDay)).length;
   const isToday = selectedDay === todayKey;
 
-  const selectedDateObj = new Date(selectedDay + "T00:00:00");
+  const selectedDateObj = new Date(selectedDay + "T12:00:00");
   const selectedLabel = isToday
     ? "Oggi"
     : selectedDateObj.toLocaleDateString("it", { weekday:"long", day:"numeric", month:"long" });
